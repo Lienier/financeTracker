@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Charts Row -->
+<div class="row mb-4">
+    <!-- Monthly Trends Chart -->
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Monthly Spending Trends</h5>
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Category Distribution Chart -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Expense Distribution</h5>
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Analysis Table -->
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Category Analysis</h5>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Percentage</th>
+                        <th>Distribution</th>
+                    </tr>
+                </thead>
+                <tbody id="categoryAnalysis">
+                    <tr>
+                        <td colspan="4" class="text-center">Loading data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Format currency without peso sign
+    const formatCurrency = (amount) => {
+        return amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    };
+
+    // Initialize charts with empty data
+    const trendChart = new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Monthly Expenses',
+                data: [],
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ₱${formatCurrency(context.parsed.y)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return `₱${formatCurrency(value)}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    const categoryChart = new Chart(document.getElementById('categoryChart'), {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    'rgb(255, 99, 132)',
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 206, 86)',
+                    'rgb(75, 192, 192)',
+                    'rgb(153, 102, 255)',
+                    'rgb(255, 159, 64)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${context.label}: ₱${formatCurrency(value)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Update trend chart
+    const updateTrendChart = async () => {
+        try {
+            const response = await fetch('/get_monthly_data/expense');
+            const data = await response.json();
+            
+            trendChart.data.labels = data.labels;
+            trendChart.data.datasets[0].data = data.values;
+            trendChart.update();
+        } catch (error) {
+            console.error('Error updating trend chart:', error);
+        }
+    };
+
+    // Update category chart and analysis
+    const updateCategoryAnalysis = async () => {
+        try {
+            const response = await fetch('/get_category_data/expense');
+            const data = await response.json();
+            
+            // Prepare data for chart
+            const categories = [];
+            const amounts = [];
+            let total = 0;
+            
+            for (const [category, amount] of Object.entries(data)) {
+                if (category === '_total') {
+                    total = amount;
+                    continue;
+                }
+                categories.push(category);
+                amounts.push(amount);
+            }
+            
+            // Update doughnut chart
+            categoryChart.data.labels = categories;
+            categoryChart.data.datasets[0].data = amounts;
+            categoryChart.update();
+            
+            // Update analysis table
+            let tableHtml = '';
+            for (let i = 0; i < categories.length; i++) {
+                const percentage = ((amounts[i] / total) * 100).toFixed(1);
+                tableHtml += `
+                    <tr>
+                        <td>${categories[i]}</td>
+                        <td><span>₱${formatCurrency(amounts[i])}</span></td>
+                        <td>${percentage}%</td>
+                        <td>
+                            <div class="progress">
+                                <div class="progress-bar bg-primary" role="progressbar" 
+                                    style="width: ${percentage}%" 
+                                    aria-valuenow="${percentage}" 
+                                    aria-valuemin="0" 
+                                    aria-valuemax="100">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>`;
+            }
+            document.getElementById('categoryAnalysis').innerHTML = tableHtml || '<tr><td colspan="4" class="text-center">No data available</td></tr>';
+        } catch (error) {
+            console.error('Error updating category analysis:', error);
+        }
+    };
+
+    // Initialize everything
+    updateTrendChart();
+    updateCategoryAnalysis();
+
+    // Set up auto-refresh every minute
+    setInterval(() => {
+        updateTrendChart();
+        updateCategoryAnalysis();
+    }, 60000);
+});
+</script>
+{% endblock %}
