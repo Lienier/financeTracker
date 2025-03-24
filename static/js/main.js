@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Format currency inputs
-    const currencyInputs = document.querySelectorAll('input[type="number"][step="0.01"]');
+    const currencyInputs = document.querySelectorAll('input[type="number"][step="1"]');
     currencyInputs.forEach(input => {
         input.addEventListener('change', function() {
             this.value = parseFloat(this.value).toFixed(2);
@@ -100,3 +100,5 @@ document.addEventListener('DOMContentLoaded', function() {
     handleResponsiveSidebar();
     window.addEventListener('resize', handleResponsiveSidebar);
 });
+
+

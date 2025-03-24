@@ -29,8 +29,9 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = 'login'
 
+    # Ensure all tables are created
     with app.app_context():
-        db.create_all()  # Create tables for all models
+        db.create_all()
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -88,7 +89,7 @@ def create_app():
         logout_user()
         return redirect(url_for('login'))
 
-    @app.route('/transactions')
+    @app.route('/transactions', methods=['GET', 'POST'])
     @login_required
     def transactions():
         page = request.args.get('page', 1, type=int)
@@ -143,34 +144,7 @@ def create_app():
         
         return redirect(url_for('index'))
 
-    @app.route('/edit_transaction/<int:id>', methods=['GET', 'POST'])
-    @login_required
-    def edit_transaction(id):
-        transaction = Transaction.query.get_or_404(id)
-        
-        # Ensure user owns this transaction
-        if transaction.user_id != current_user.id:
-            flash('Unauthorized access')
-            return redirect(url_for('transactions'))
-        
-        if request.method == 'POST':
-            transaction.description = request.form.get('description')
-            transaction.amount = float(request.form.get('amount'))
-            transaction.category = request.form.get('category')
-            transaction.type = request.form.get('type')
-            
-            db.session.commit()
-            flash('Transaction updated successfully')
-            return redirect(url_for('transactions'))
-            
-        return jsonify({
-            'id': transaction.id,
-            'description': transaction.description,
-            'amount': transaction.amount,
-            'category': transaction.category,
-            'type': transaction.type
-        })
-
+    
     @app.route('/delete_transaction/<int:id>', methods=['POST'])
     @login_required
     def delete_transaction(id):
@@ -214,15 +188,15 @@ def create_app():
             type='expense'
         ).group_by(Transaction.category).all()
         
-        # Get monthly spending data for the last 6 months
-        six_months_ago = datetime.utcnow() - timedelta(days=180)
+        # Get monthly spending data for the last 3 months
+        three_months_ago = datetime.utcnow() - timedelta(days=90)
         monthly_data = db.session.query(
             func.strftime('%Y-%m', Transaction.date).label('month'),
             func.sum(Transaction.amount).label('total')
         ).filter(
             Transaction.user_id == current_user.id,
             Transaction.type == 'expense',
-            Transaction.date >= six_months_ago
+            Transaction.date >= three_months_ago
         ).group_by('month').order_by('month').all()
         
         # Format monthly data for better display
@@ -264,8 +238,8 @@ def create_app():
     @app.route('/get_monthly_trends')
     @login_required
     def get_monthly_trends():
-        # Get last 6 months of expenses
-        six_months_ago = datetime.now() - timedelta(days=180)
+        # Get last 3 months of expenses
+        three_months_ago = datetime.now() - timedelta(days=90)
         
         expenses = db.session.query(
             func.strftime('%Y-%m', Transaction.date).label('month'),
@@ -273,7 +247,7 @@ def create_app():
         ).filter(
             Transaction.user_id == current_user.id,
             Transaction.type == 'expense',
-            Transaction.date >= six_months_ago
+            Transaction.date >= three_months_ago
         ).group_by('month').order_by('month').all()
         
         months = []
@@ -379,7 +353,7 @@ def create_app():
                 Transaction.type == transaction_type,
                 Transaction.date >= start_date,
                 Transaction.date <= end_date
-            ).group_by('month').all()
+            ).group_by('month').order_by('month').all()
             
             # Update monthly totals
             for month, total in transactions:
@@ -480,6 +454,27 @@ def create_app():
         except Exception as e:
             db.session.rollback()
             return jsonify({'error': str(e)}), 400
+        
+
+    @app.route('/api/transactions')
+    @login_required
+    def get_transactions():
+        transactions = Transaction.query.filter_by(user_id=current_user.id).all()
+        
+        transactions_data = [
+            {
+                'id': t.id,
+                'description': t.description,
+                'amount': float(t.amount),
+                'category': t.category,
+                'type': t.type,
+                'date': t.date.strftime('%Y-%m-%d')
+            }
+            for t in transactions
+        ]
+        
+        return jsonify(transactions_data), 200
+
 
     @app.route('/get_budgets')
     @login_required
@@ -523,6 +518,7 @@ def create_app():
 
     return app
 
+# Run the Flask application
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True)

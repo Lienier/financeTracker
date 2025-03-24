@@ -23,10 +23,43 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="transactionsTable">
+                <tbody>
+                    {% for transaction in transactions %}
                     <tr>
-                        <td colspan="6" class="text-center">Loading transactions...</td>
+                        <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ transaction.description }}</td>
+                        <td>{{ transaction.category }}</td>
+                        <td class="{{ 'text-success' if transaction.type == 'income' else 'text-danger' }}">
+                            {{ transaction.type }}
+                        </td>
+                        <td class="{{ 'text-success' if transaction.type == 'income' else 'text-danger' }}">
+                            {{ '₱{:,.2f}'.format(transaction.amount) }}
+                        </td>
+                        <td>
+                            <!-- Edit Button -->
+                            <button class="btn btn-sm btn-warning edit-btn" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editTransactionModal"
+                                    data-id="{{ transaction.id }}"
+                                    data-type="{{ transaction.type }}"
+                                    data-description="{{ transaction.description }}"
+                                    data-category="{{ transaction.category }}"
+                                    data-amount="{{ transaction.amount }}"
+                                    data-date="{{ transaction.date.strftime('%Y-%m-%d') }}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        
+                            <!-- Delete Button -->
+                            <button class="btn btn-sm btn-danger delete-btn"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteConfirmModal"
+                                    data-id="{{ transaction.id }}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                        
                     </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -42,7 +75,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="transactionForm">
+                <form id="transactionForm" method="POST">
                     <div class="mb-3">
                         <label class="form-label">Type</label>
                         <div class="btn-group w-100" role="group">
@@ -104,8 +137,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="editTransactionForm">
-                    <input type="hidden" name="transaction_id">
+                <form id="editTransactionForm" method="POST">
+                    <input type="hidden" id="transaction_id" name="transaction_id">
                     <div class="mb-3">
                         <label class="form-label">Type</label>
                         <div class="btn-group w-100" role="group">
@@ -204,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load transactions
     const loadTransactions = async () => {
         try {
-            const response = await fetch('/get_transactions');
+            const response = await fetch('transactions');
             const transactions = await response.json();
             
             let html = '';
@@ -238,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </tr>`;
             }
             
-            document.getElementById('transactionsTable').innerHTML = html || '<tr><td colspan="6" class="text-center">No transactions found</td></tr>';
+            document.getElementById('transaction').innerHTML = html || '<tr><td colspan="6" class="text-center">No transactions found</td></tr>';
         } catch (error) {
             console.error('Error loading transactions:', error);
         }
@@ -291,8 +324,8 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         const formData = new FormData(e.target);
+        const id = formData.get('transaction_id');
         const data = {
-            id: parseInt(formData.get('transaction_id')),
             type: formData.get('type'),
             description: formData.get('description'),
             category: formData.get('category'),
@@ -301,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         try {
-            const response = await fetch('/update_transaction', {
+            const response = await fetch(`/edit_transaction/${id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -330,7 +363,7 @@ async function editTransaction(id) {
         const transaction = await response.json();
         
         const form = document.getElementById('editTransactionForm');
-        form.querySelector('input[name="transaction_id"]').value = transaction.id;
+        form.querySelector('input[id="transaction_id"]').value = transaction.id;
         form.querySelector(`input[value="${transaction.type}"]`).checked = true;
         form.querySelector('input[name="description"]').value = transaction.description;
         form.querySelector('select[name="category"]').value = transaction.category;

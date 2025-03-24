@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.progress {
+    height: 20px;
+    border-radius: 0.25rem;
+    background-color: #e9ecef;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.875rem;
+}
+
+.progress-bar.bg-success { background-color: #28a745; }
+.progress-bar.bg-warning { background-color: #ffc107; }
+.progress-bar.bg-danger { background-color: #dc3545; }
+
+.budget-item {
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.budget-item:last-child {
+    border-bottom: none;
+}
+
+.progress-column {
+    width: 30%;
+}
+
+.delete-form {
+    display: inline;
+}
+</style>
+
+<div class="container mt-4">
+    <h2>Budget Management</h2>
+    
+    <!-- Add/Edit Budget Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Add New Budget</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('budgets') }}">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select class="form-control" id="category" name="category" required>
+                                <option value="">Select Category</option>
+                                <option value="Food">Food</option>
+                                <option value="Transportation">Transportation</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Entertainment">Entertainment</option>
+                                <option value="Shopping">Shopping</option>
+                                <option value="Healthcare">Healthcare</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="amount">Amount (₱)</label>
+                            <input type="number" class="form-control" id="amount" name="amount" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">Save Budget</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Budget List -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Current Month's Budgets</h5>
+        </div>
+        <div class="card-body">
+            {% if budgets %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Budget</th>
+                            <th>Spent</th>
+                            <th>Remaining</th>
+                            <th>Progress</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for budget in budgets %}
+                        <tr>
+                            <td>{{ budget.category }}</td>
+                            <td>₱{{ "%.2f"|format(budget.amount) }}</td>
+                            <td>₱{{ "%.2f"|format(budget.spent) }}</td>
+                            <td>₱{{ "%.2f"|format(budget.remaining) }}</td>
+                            <td class="progress-column">
+                                <div class="progress">
+                                    <div class="progress-bar bg-{{ budget.status }}" 
+                                         role="progressbar" 
+                                         style="width: {{ budget.percentage }}%"
+                                         aria-valuenow="{{ budget.percentage }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        {{ "%.1f"|format(budget.percentage) }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('delete_budget', budget_id=budget.id) }}" class="delete-form"
+                                      onsubmit="return confirm('Are you sure you want to delete this budget?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                No budgets set for the current month. Add a budget to start tracking your expenses.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
